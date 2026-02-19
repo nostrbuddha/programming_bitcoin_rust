@@ -1,4 +1,4 @@
-use prog_bitcoin::FieldElement;
+use prog_bitcoin::primitives::field_element::FieldElement;
 
 fn main() {
     let fe1 = FieldElement::new(2, 7);

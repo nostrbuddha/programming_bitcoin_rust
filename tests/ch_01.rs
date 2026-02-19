@@ -1,4 +1,4 @@
-use prog_bitcoin::FieldElement;
+use prog_bitcoin::primitives::field_element::FieldElement;
 
 #[test]
 fn ex02_01() {
