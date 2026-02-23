@@ -1,40 +1,45 @@
 use std::ops;
+use crypto_bigint::U256;
+use crypto_bigint::I256;
+use crypto_bigint::NonZero;
 
-// TODO: To be changed to use BigInt
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
 pub struct FieldElement {
-    pub num: u32,
-    pub prime: u32
+    pub num: U256,
+    pub prime: U256
 }
 
 impl FieldElement {
-    pub fn new(num: u32, prime: u32) -> Self {
-        assert!(num < prime, "Num {} not in field range 0 to {}", num, prime - 1);
+    pub fn new(num: U256, prime: U256) -> Self {
+        assert!(num < prime, "Num {} not in field range 0 to {}", num, prime - U256::ONE);
         Self {
             num,
             prime
         }
     }
 
-    pub fn pow(self, exponent: i32) -> FieldElement {
-        let mut num = 1;
-        let mut multi = if exponent > 0 {
-            exponent
+    pub fn pow(self, exponent: I256) -> FieldElement {
+        let mut num: U256 = U256::ONE;
+        let order: U256 = self.prime - U256::ONE;
+
+        let mut exp: U256 = if exponent >= I256::ZERO {
+            exponent.as_uint() % order
         } else {
-            (self.prime as i32) + exponent - 1
+            let neg: U256 = exponent.wrapping_neg().as_uint() % order;
+            (order - neg) % order
         };
 
         loop {
-            if multi > 0 {
+            if exp > U256::ZERO {
                 num = (num * self.num) % self.prime;
-                multi -= 1;
+                exp -= U256::ONE;
             } else {
                 break;
             }
         }
 
         FieldElement {
-            num,
+            num: num,
             prime: self.prime
         }
     }
@@ -59,7 +64,11 @@ impl ops::Sub for FieldElement {
 
     fn sub(self, other: FieldElement) -> FieldElement {
         assert_eq!(self.prime, other.prime, "Cannot operate between different fields");
-        let num = (self.num + self.prime - other.num) % self.prime;
+        let num = if self.num >= other.num {
+            self.num - other.num
+        } else {
+            self.prime - (other.num - self.num) % self.prime
+        };
         FieldElement {
             num,
             prime: self.prime
@@ -73,7 +82,10 @@ impl ops::Mul for FieldElement {
 
     fn mul(self, other: FieldElement) -> FieldElement {
         assert_eq!(self.prime, other.prime, "Cannot operate between different fields");
-        let num = (self.num * other.num) % self.prime;
+
+        let prime_nz = NonZero::new(self.prime).unwrap();
+        let num = self.num.mul_mod(&other.num, &prime_nz);
+
         FieldElement {
             num,
             prime: self.prime
@@ -87,7 +99,8 @@ impl ops::Div for FieldElement {
 
     fn div(self, other: FieldElement) -> FieldElement {
         assert_eq!(self.prime, other.prime, "Cannot operate between different fields");
-        let divisor = other.pow((other.prime - 2) as i32);
+        let exp = other.prime.as_int() - I256::from(2);
+        let divisor = other.pow(exp);
         let num = (self.num * divisor.num) % self.prime;
         FieldElement {
             num,
@@ -97,127 +110,211 @@ impl ops::Div for FieldElement {
 
 }
 
-/*
 #[cfg(test)]
-mod field_element_tests {
+mod field_element_basic_tests {
     use super::*;
 
     #[test]
-    fn fe_init_valid() {
-        let fe_7_2 = FieldElement::new(2, 7);
-        assert_eq!(fe_7_2.num, 2);
-        assert_eq!(fe_7_2.prime, 7);
+    fn init_num_valid() {
+        let n2: U256 = U256::from(2u32);
+        let n4: U256 = U256::from(4u32);
+        let n7: U256 = U256::from(7u32);
+        let n31: U256 = U256::from(31u32);
+        let fe_7_2 = FieldElement::new(n2, n7);
+        assert_eq!(fe_7_2.num, n2);
+        assert_eq!(fe_7_2.prime, n7);
 
-        let fe_31_4 = FieldElement::new(4, 31);
-        assert_eq!(fe_31_4.num, 4);
-        assert_eq!(fe_31_4.prime, 31);
+        let fe_31_4= FieldElement::new(n4, n31);
+        assert_eq!(fe_31_4.num, n4);
+        assert_eq!(fe_31_4.prime, n31);
     }
+
+    #[test]
+    fn init_valid() {
+        let p: U256 = U256::from_be_hex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F");
+        let gx: U256 = U256::from_be_hex("79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798");
+        let gy: U256 = U256::from_be_hex("483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8");
+        let fe_gx_p = FieldElement::new(gx, p);
+        assert_eq!(fe_gx_p.num, gx);
+        assert_eq!(fe_gx_p.prime, p);
+
+        let fe_gy_p = FieldElement::new(gy, p);
+        assert_eq!(fe_gy_p.num, gy);
+        assert_eq!(fe_gy_p.prime, p);
+    }
+
 
     #[test]
     #[should_panic(expected = "not in field range")]
-    fn fe_init_invalid1() {
-        FieldElement::new(7, 7);
+    fn init_invalid() {
+        let n: U256 = U256::from_be_hex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF2F");
+        let p: U256 = U256::from_be_hex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F");
+        FieldElement::new(n, p);
     }
 
     #[test]
-    #[should_panic(expected = "not in field range")]
-    fn fe_init_invalid2() {
-        FieldElement::new(10, 7);
+    fn eq() {
+        let gx: U256 = U256::from_be_hex("79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798");
+        let p: U256 = U256::from_be_hex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F");
+        let fe1 = FieldElement::new(gx, p);
+        let fe2 = FieldElement::new(gx, p);
+        assert_eq!(fe1, fe2);
+        assert!(fe1 == fe2);
     }
 
     #[test]
-    fn fe_eq() {
-        let fe_7_2a = FieldElement::new(2, 7);
-        let fe_7_2b = FieldElement::new(2, 7);
-        assert_eq!(fe_7_2a, fe_7_2b);
-        assert!(fe_7_2a == fe_7_2b);
+    fn neq() {
+        let gx: U256 = U256::from_be_hex("79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798");
+        let gy: U256 = U256::from_be_hex("483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8");
+        let p: U256 = U256::from_be_hex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F");
+        let fe1 = FieldElement::new(gx, p);
+        let fe2 = FieldElement::new(gy, p);
+        assert_ne!(fe1, fe2);
+        assert!(fe1 != fe2);
     }
+}
 
+#[cfg(test)]
+mod field_element_ops_tests {
+    use super::*;
     #[test]
-    fn fe_neq() {
-        let fe_7_2 = FieldElement::new(2, 7);
-        let fe_7_4 = FieldElement::new(4, 7);
-        assert_ne!(fe_7_2, fe_7_4);
-        assert!(fe_7_2 != fe_7_4);
-    }
+    fn add_valid() {
+        let x1: U256 = U256::from_be_hex("79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798");
+        let x2: U256 = U256::from(10u16);
+        let y1: U256 = U256::from_be_hex("483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8");
+        let p: U256 = U256::from_be_hex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F");
+        let fe_x1 = FieldElement::new(x1, p);
+        let fe_x2 = FieldElement::new(x2, p);
+        let fe_y1 = FieldElement::new(y1, p);
 
-    // TODO: Do for bigger fields and numbers
-    #[test]
-    fn fe_add_valid() {
-        let fe_7_2 = FieldElement::new(2, 7);
-        let fe_7_3 = FieldElement::new(3, 7);
-        let fe_7_5 = FieldElement::new(5, 7);
-        let fe_7_6 = FieldElement::new(6, 7);
+        let x3: U256 = U256::from_be_hex("79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F817A2");
+        let sum1 = fe_x1 + fe_x2;
+        assert_eq!(sum1.num, x3);
+        assert_eq!(sum1.prime, p);
 
-        let fe_2p3 = fe_7_2 + fe_7_3;
-        assert_eq!(fe_2p3.num, 5);
-        assert_eq!(fe_2p3.prime, 7);
+        let sum2_num: U256 = U256::from_be_hex("c1f940f620808011b3455e91dc9813afffb3b123d4537cf2f63a51eb1208ec50");
+        let sum2 = fe_x1 + fe_y1;
+        assert_eq!(sum2.num, sum2_num);
+        assert_eq!(sum2.prime, p);
 
-        let fe_5p6 = fe_7_5 + fe_7_6;
-        assert_eq!(fe_5p6.num, 4);
-        assert_eq!(fe_5p6.prime, 7);
-    }
-
-    #[test]
-    #[should_panic(expected = "Cannot operate between different fields")]
-    fn fe_add_invalid() {
-        let fe_7_2 = FieldElement::new(2, 7);
-        let fe_8_2 = FieldElement::new(2, 8);
-
-        let _ = fe_7_2 + fe_8_2;
-    }
-
-    // TODO: Do for bigger fields and numbers
-    #[test]
-    fn fe_mul_valid() {
-        let fe_7_2 = FieldElement::new(2, 7);
-        let fe_7_3 = FieldElement::new(3, 7);
-        let fe_7_5 = FieldElement::new(5, 7);
-        let fe_7_6 = FieldElement::new(6, 7);
-
-        let fe_3m2 = fe_7_3 * fe_7_2;
-        assert_eq!(fe_3m2.num, 6);
-        assert_eq!(fe_3m2.prime, 7);
-
-        let fe_5m6 = fe_7_5 * fe_7_6;
-        assert_eq!(fe_5m6.num, 2);
-        assert_eq!(fe_5m6.prime, 7);
     }
 
     #[test]
     #[should_panic(expected = "Cannot operate between different fields")]
-    fn fe_mul_invalid() {
-        let fe_7_2 = FieldElement::new(2, 7);
-        let fe_8_2 = FieldElement::new(2, 8);
+    fn add_invalid() {
+        let x1: U256 = U256::from_be_hex("79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798");
+        let p1: U256 = U256::from_be_hex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F");
+        let p2: U256 = U256::from_be_hex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2A");
+        let fe_x1_p1 = FieldElement::new(x1, p1);
+        let fe_x1_p2 = FieldElement::new(x1, p2);
 
-        let _ = fe_7_2 * fe_8_2;
+        let _ = fe_x1_p1 + fe_x1_p2;
     }
 
-    // TODO: Do for bigger fields and numbers
+
     #[test]
-    fn fe_div_valid() {
-        let fe_7_2 = FieldElement::new(2, 7);
-        let fe_7_3 = FieldElement::new(3, 7);
-        let fe_7_5 = FieldElement::new(5, 7);
-        let fe_7_6 = FieldElement::new(6, 7);
+    fn sub_valid() {
+        let x1: U256 = U256::from_be_hex("79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798");
+        let x2: U256 = U256::from(10u16);
+        let y1: U256 = U256::from_be_hex("483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8");
+        let p: U256 = U256::from_be_hex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F");
+        let fe_x1 = FieldElement::new(x1, p);
+        let fe_x2 = FieldElement::new(x2, p);
+        let fe_y1 = FieldElement::new(y1, p);
 
-        let fe_3d2 = fe_7_3 / fe_7_2;
-        assert_eq!(fe_3d2.num, 5);
-        assert_eq!(fe_3d2.prime, 7);
+        let x3: U256 = U256::from_be_hex("79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F8178E");
+        let sub1 = fe_x1 - fe_x2;
+        assert_eq!(sub1.num, x3);
+        assert_eq!(sub1.prime, p);
 
-        let fe_5d6 = fe_7_5 / fe_7_6;
-        assert_eq!(fe_5d6.num, 2);
-        assert_eq!(fe_5d6.prime, 7);
+        let sub2_num: U256 = U256::from_be_hex("31838c07d338f746f7fb6699c076025e058448928748d4bfbdaab0cb1be742e0");
+        let sub2 = fe_x1 - fe_y1;
+        assert_eq!(sub2.num, sub2_num);
+        assert_eq!(sub2.prime, p);
+
     }
 
     #[test]
     #[should_panic(expected = "Cannot operate between different fields")]
-    fn fe_div_invalid() {
-        let fe_7_2 = FieldElement::new(2, 7);
-        let fe_8_2 = FieldElement::new(2, 8);
+    fn sub_invalid() {
+        let x1: U256 = U256::from_be_hex("79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798");
+        let p1: U256 = U256::from_be_hex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F");
+        let p2: U256 = U256::from_be_hex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2A");
+        let fe_x1_p1 = FieldElement::new(x1, p1);
+        let fe_x1_p2 = FieldElement::new(x1, p2);
 
-        let _ = fe_7_2 / fe_8_2;
+        let _ = fe_x1_p1 - fe_x1_p2;
     }
+
+    #[test]
+    fn mul_valid() {
+        let x1: U256 = U256::from_be_hex("79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798");
+        let x2: U256 = U256::from(10u32);
+        let y1: U256 = U256::from_be_hex("483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8");
+        let p: U256 = U256::from_be_hex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F");
+        let fe_x1 = FieldElement::new(x1, p);
+        let fe_x2 = FieldElement::new(x2, p);
+        let fe_y1 = FieldElement::new(y1, p);
+
+        let res1_num: U256 = U256::from_be_hex("c17000f5c29f54bb5843d9da11466e461a17e08fca0d987d83790d92e5b0fb34");
+        let res1 = fe_x1 * fe_x2;
+        assert_eq!(res1.num, res1_num);
+        assert_eq!(res1.prime, p);
+
+        let res2_num: U256 = U256::from_be_hex("fd3dc529c6eb60fb9d166034cf3c1a5a72324aa9dfd3428a56d7e1ce0179fd9b");
+        let res2 = fe_x1 * fe_y1;
+        assert_eq!(res2.num, res2_num);
+        assert_eq!(res2.prime, p);
+    }
+
+    #[test]
+    #[should_panic(expected = "Cannot operate between different fields")]
+    fn mul_invalid() {
+        let x1: U256 = U256::from_be_hex("79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798");
+        let p1: U256 = U256::from_be_hex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F");
+        let p2: U256 = U256::from_be_hex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2A");
+        let fe_x1_p1 = FieldElement::new(x1, p1);
+        let fe_x1_p2 = FieldElement::new(x1, p2);
+
+        let _ = fe_x1_p1 * fe_x1_p2;
+    }
+
+    // Discrete log problem
+    /*
+    #[test]
+    fn div_valid() {
+        let x1: U256 = U256::from_be_hex("79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798");
+        let x2: U256 = U256::from(10u32);
+        let y1: U256 = U256::from_be_hex("483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8");
+        let p: U256 = U256::from_be_hex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F");
+        let fe_x1 = FieldElement::new(x1, p);
+        let fe_x2 = FieldElement::new(x2, p);
+        let fe_y1 = FieldElement::new(y1, p);
+
+        let res1_num: U256 = U256::from_be_hex("0c2ca3d97f62df913bc33d0efb0d811a4d0f99491e2e3748ef650cef824c025c");
+        let res1 = fe_x1 / fe_x2;
+        assert_eq!(res1.num, res1_num);
+        assert_eq!(res1.prime, p);
+
+        let res2_num: U256 = U256::from_be_hex("2db7da16ef4bd6e01dfaad38c11521cbc90dda6ded1975fc41895c5d541f5127");
+        let res2 = fe_x1 / fe_y1;
+        assert_eq!(res2.num, res2_num);
+        assert_eq!(res2.prime, p);
+    }
+    */
+
+    /*
+    #[test]
+    #[should_panic(expected = "Cannot operate between different fields")]
+    fn div_invalid() {
+        let x1: U256 = U256::from_be_hex("79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798");
+        let p1: U256 = U256::from_be_hex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F");
+        let p2: U256 = U256::from_be_hex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2A");
+        let fe_x1_p1 = FieldElement::new(x1, p1);
+        let fe_x1_p2 = FieldElement::new(x1, p2);
+
+        let _ = fe_x1_p1 / fe_x1_p2;
+    }
+    */
 
 }
-*/

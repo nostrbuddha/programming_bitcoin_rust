@@ -1,4 +1,5 @@
 pub mod primitives;
+pub mod s256;
 
 #[macro_export]
 macro_rules! fen {

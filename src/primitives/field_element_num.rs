@@ -97,7 +97,7 @@ impl ops::Div for FieldElementNum {
 }
 
 #[cfg(test)]
-mod field_element_num_tests {
+mod field_element_num_basic_tests {
     use super::*;
 
     #[test]
@@ -138,8 +138,12 @@ mod field_element_num_tests {
         assert_ne!(fe_7_2, fe_7_4);
         assert!(fe_7_2 != fe_7_4);
     }
+}
 
-    // TODO: Do for bigger fields and numbers
+#[cfg(test)]
+mod field_element_num_ops_tests {
+    use super::*;
+
     #[test]
     fn add_valid() {
         let fe_7_2 = FieldElementNum::new(2, 7);
@@ -165,7 +169,32 @@ mod field_element_num_tests {
         let _ = fe_7_2 + fe_8_2;
     }
 
-    // TODO: Do for bigger fields and numbers
+
+    #[test]
+    fn sub_valid() {
+        let fe_7_2 = FieldElementNum::new(2, 7);
+        let fe_7_3 = FieldElementNum::new(3, 7);
+        let fe_7_5 = FieldElementNum::new(5, 7);
+        let fe_7_6 = FieldElementNum::new(6, 7);
+
+        let fe_2p3 = fe_7_2 - fe_7_3;
+        assert_eq!(fe_2p3.num, 6);
+        assert_eq!(fe_2p3.prime, 7);
+
+        let fe_5p6 = fe_7_5 - fe_7_6;
+        assert_eq!(fe_5p6.num, 6);
+        assert_eq!(fe_5p6.prime, 7);
+    }
+
+    #[test]
+    #[should_panic(expected = "Cannot operate between different fields")]
+    fn sub_invalid() {
+        let fe_7_2 = FieldElementNum::new(2, 7);
+        let fe_8_2 = FieldElementNum::new(2, 8);
+
+        let _ = fe_7_2 - fe_8_2;
+    }
+
     #[test]
     fn mul_valid() {
         let fe_7_2 = FieldElementNum::new(2, 7);
@@ -191,7 +220,6 @@ mod field_element_num_tests {
         let _ = fe_7_2 * fe_8_2;
     }
 
-    // TODO: Do for bigger fields and numbers
     #[test]
     fn div_valid() {
         let fe_7_2 = FieldElementNum::new(2, 7);
