@@ -3,10 +3,6 @@ use crypto_bigint::{I256, U256};
 
 use crate::s256::{s256_field::S256Field, signature::Signature, scalar::Scalar};
 
-const N: U256 = U256::from_be_hex(
-    "fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141"
-);
-
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
 pub struct S256Point(Option<S256Field>, Option<S256Field>);
 
@@ -24,12 +20,21 @@ impl S256Point {
             Self(x, y)
         }
     }
+
     pub fn new_concrete(x: S256Field, y: S256Field) -> Self {
         Self::new(Some(x), Some(y))
     }
 
+    pub fn x(self) -> Option<S256Field> {
+        self.0
+    }
+
+    pub fn y(self) -> Option<S256Field> {
+        self.1
+    }
+
     pub fn rmul(self, coefficeint: U256) -> Self {
-        let mut coef = coefficeint % N;
+        let mut coef = coefficeint % Self::n();
 
         let mut result = S256Point::new(None, None);
         let mut current = self;
@@ -60,6 +65,12 @@ impl S256Point {
         S256Field::new(U256::from_be_hex("0000000000000000000000000000000000000000000000000000000000000007"))
     }
 
+    pub fn n() -> U256 {
+        U256::from_be_hex(
+            "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141"
+        )
+    }
+
     pub fn verify(self, z: S256Field, sig: Signature) -> bool {
         let s_inv = Scalar::new(sig.s.value()).inv();
         let u = Scalar::new(z.value())* s_inv;
@@ -68,7 +79,7 @@ impl S256Point {
         let total = Self::g().rmul(u.value()) + self.rmul(v.value());
 
         let x = total.0.unwrap().value();
-        let x_mod_n = x % N;
+        let x_mod_n = x % Self::n();
 
         x_mod_n == sig.r.value()
     }
@@ -133,7 +144,7 @@ mod s256_point_tests_temp {
             Some(S256Field::new(U256::from_be_hex("483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8")))
         );
 
-        let res = G.rmul(N);
+        let res = G.rmul(S256Point::n());
         assert_eq!(res.0, None);
         assert_eq!(res.1, None);
     }

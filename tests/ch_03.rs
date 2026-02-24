@@ -1,6 +1,8 @@
 use crypto_bigint::U256;
 use prog_bitcoin::primitives::point_fe_num::PointFeNum;
 use prog_bitcoin::fen;
+use prog_bitcoin::s256::hash256::hash256;
+use prog_bitcoin::s256::private_key::PrivateKey;
 use prog_bitcoin::s256::s256_field::S256Field;
 use prog_bitcoin::s256::s256_point::S256Point;
 use prog_bitcoin::s256::signature::Signature;
@@ -270,4 +272,17 @@ fn ex06_02() {
     let res = p.verify(z, sig);
 
     assert!(res);
+}
+
+#[test]
+fn ex07() {
+    let e = PrivateKey::new(U256::from_u32(12345u32));
+    let z = hash256(b"Programming Bitcoin!");
+    let z_u256 = U256::from_be_slice(&z);
+
+    let sig = e.sign(z_u256);
+
+    assert_eq!(hex::encode(z), "969f6056aa26f7d2795fd013fe88868d09c9f6aed96965016e1936ae47060d48");
+    assert_eq!(hex::encode(sig.r.value().to_be_bytes()), "2b698a0f0a4041b77e63488ad48c23e8e8838dd1fb7520408b121697b782ef22");
+    assert_eq!(hex::encode(sig.s.value().to_be_bytes()), "1dbc63bfef4416705e602a7b564161167076d8b20990a0f26f316cff2cb0bc1a");
 }
