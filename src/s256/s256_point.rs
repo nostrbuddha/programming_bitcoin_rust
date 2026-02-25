@@ -1,7 +1,7 @@
 use std::ops;
 use crypto_bigint::{I256, U256};
 
-use crate::s256::{s256_field::S256Field, signature::Signature, scalar::Scalar};
+use crate::s256::{s256_field::S256Field, signature::Signature, scalr::Scalar};
 
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
 pub struct S256Point(Option<S256Field>, Option<S256Field>);
@@ -72,16 +72,16 @@ impl S256Point {
     }
 
     pub fn verify(self, z: S256Field, sig: Signature) -> bool {
-        let s_inv = Scalar::new(sig.s.value()).inv();
-        let u = Scalar::new(z.value())* s_inv;
-        let v = Scalar::new(sig.r.value()) * s_inv;
+        let s_inv = Scalar::new(sig.s.num).inv();
+        let u = Scalar::new(z.num)* s_inv;
+        let v = Scalar::new(sig.r.num) * s_inv;
 
-        let total = Self::g().rmul(u.value()) + self.rmul(v.value());
+        let total = Self::g().rmul(u.num) + self.rmul(v.num);
 
-        let x = total.0.unwrap().value();
+        let x = total.0.unwrap().num;
         let x_mod_n = x % Self::n();
 
-        x_mod_n == sig.r.value()
+        x_mod_n == sig.r.num
     }
 }
 
@@ -139,12 +139,12 @@ mod s256_point_tests_temp {
 
     #[test]
     fn g_order() {
-        let G = S256Point(
+        let g = S256Point(
             Some(S256Field::new(U256::from_be_hex("79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"))),
             Some(S256Field::new(U256::from_be_hex("483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8")))
         );
 
-        let res = G.rmul(S256Point::n());
+        let res = g.rmul(S256Point::n());
         assert_eq!(res.0, None);
         assert_eq!(res.1, None);
     }
