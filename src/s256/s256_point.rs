@@ -1,6 +1,5 @@
 use std::ops;
 use crypto_bigint::{I256, U256};
-
 use crate::s256::{s256_field::S256Field, signature::Signature, scalr::Scalar};
 
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
@@ -83,8 +82,77 @@ impl S256Point {
 
         x_mod_n == sig.r.num
     }
-}
 
+    pub fn sec(self, compressed: bool) -> Vec<u8> {
+        let x_bytes = self.x().unwrap().num.to_be_bytes();
+        let y_bytes = self.y().unwrap().num.to_be_bytes();
+
+        let mut result;
+        if compressed {
+            result = Vec::with_capacity(33);
+            if self.y().unwrap().num % S256Field::new_two().num == U256::ZERO {
+                result.push(0x02);
+            } else {
+                result.push(0x03);
+            }
+            result.extend_from_slice(&x_bytes);
+        } else {
+            result = Vec::with_capacity(65);
+            result.push(0x04);
+            result.extend_from_slice(&x_bytes);
+            result.extend_from_slice(&y_bytes);
+        }
+
+        result
+    }
+
+    pub fn parse(sec: &[u8]) -> Self {
+        assert!(!sec.is_empty(), "SEC data empty");
+
+        // Uncompressed: 04 || x || y
+        if sec[0] == 0x04 {
+            assert!(sec.len() == 65, "Invalid uncompressed SEC length");
+
+            let x = U256::from_be_slice(&sec[1..33]);
+            let y = U256::from_be_slice(&sec[33..65]);
+
+            return S256Point::new(Some(S256Field::new(x)), 
+                                  Some(S256Field::new(y)));
+        }
+
+        // Compressed: 02 || x  OR  03 || x
+        assert!(sec.len() == 33, "Invalid compressed SEC length");
+
+        let is_even = sec[0] == 0x02;
+
+        let x = S256Field::new(U256::from_be_slice(&sec[1..33]));
+
+        // y^2 = x^3 + 7
+        let alpha = x.pow(I256::from(3)) + S256Field::new(U256::from(7u8));
+
+        let beta = alpha.sqrt();
+
+        let even_beta;
+        let odd_beta;
+
+        let p = x.get_prime();
+
+        if bool::from(beta.num % S256Field::new_two().num == U256::ZERO) {
+            even_beta = beta;
+            odd_beta = S256Field::new(p - beta.num);
+        } else {
+            even_beta = S256Field::new(p - beta.num);
+            odd_beta = beta;
+        }
+
+        if is_even {
+            S256Point::new(Some(x), Some(even_beta))
+        } else {
+            S256Point::new(Some(x), Some(odd_beta))
+        }
+    }
+
+}
 
 impl ops::Add for S256Point {
     type Output = S256Point;
@@ -164,8 +232,6 @@ mod s256_point_tests_temp {
         };
 
         let res = p.verify(z, sig);
-
-        println!("res: {res:?}");
 
         assert!(res);
 

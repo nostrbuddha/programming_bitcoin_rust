@@ -24,6 +24,14 @@ impl<M: Modulus> FieldElement<M> {
     }
 
     // TODO: Write test for this
+    // (p + 1) / 4
+    pub fn sqrt(self) -> Self {
+        let p = M::modulus();
+        let exponent = (p + U256::ONE) >> 2;
+        self.pow_u256(exponent)
+    }
+
+    // TODO: Write test for this
     pub fn pow(self, exponent: I256) -> Self {
         let p = M::modulus();
         let order = p - U256::ONE; // p-1
@@ -57,6 +65,10 @@ impl<M: Modulus> FieldElement<M> {
         }
 
         result
+    }
+
+    pub fn get_prime(self) -> U256 {
+        return M::modulus()
     }
 
     fn pow_u256(self, mut exp: U256) -> Self {
@@ -288,23 +300,6 @@ mod field_element_ops_tests {
     /*
     #[test]
     fn div_valid() {
-        let x1: U256 = U256::from_be_hex("79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798");
-        let x2: U256 = U256::from(10u32);
-        let y1: U256 = U256::from_be_hex("483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8");
-        let p: U256 = U256::from_be_hex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F");
-        let fe_x1 = FieldElement::new(x1, p);
-        let fe_x2 = FieldElement::new(x2, p);
-        let fe_y1 = FieldElement::new(y1, p);
-
-        let res1_num: U256 = U256::from_be_hex("0c2ca3d97f62df913bc33d0efb0d811a4d0f99491e2e3748ef650cef824c025c");
-        let res1 = fe_x1 / fe_x2;
-        assert_eq!(res1.num, res1_num);
-        assert_eq!(res1.prime, p);
-
-        let res2_num: U256 = U256::from_be_hex("2db7da16ef4bd6e01dfaad38c11521cbc90dda6ded1975fc41895c5d541f5127");
-        let res2 = fe_x1 / fe_y1;
-        assert_eq!(res2.num, res2_num);
-        assert_eq!(res2.prime, p);
     }
     */
 
