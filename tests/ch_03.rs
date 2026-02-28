@@ -1,7 +1,7 @@
 use crypto_bigint::U256;
 use prog_bitcoin::primitives::point_fe_u32::PointFEU32;
 use prog_bitcoin::{fe32, p_fe32};
-use prog_bitcoin::s256::hash256::hash256;
+use prog_bitcoin::algorithms::hash256::hash256;
 use prog_bitcoin::s256::private_key::PrivateKey;
 use prog_bitcoin::s256::s256_field::S256Field;
 use prog_bitcoin::s256::s256_point::S256Point;

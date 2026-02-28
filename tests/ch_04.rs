@@ -1,5 +1,5 @@
 use crypto_bigint::{I256, U256};
-use prog_bitcoin::s256::{base58::encode_base58, private_key::PrivateKey, s256_field::S256Field, signature::Signature};
+use prog_bitcoin::{algorithms::{base58::encode_base58, endian::{int_to_little_endian, little_endian_to_int}, hash256::hash256}, s256::{private_key::PrivateKey, s256_field::S256Field, signature::Signature}};
 
 #[test]
 fn ex01_01() {
@@ -75,4 +75,80 @@ fn ex04_03() {
     let st = hex::decode("c7207fee197d27c618aea621406f6bf5ef6fca38681d82b2f06fddbdce6feab6").unwrap();
     let res = encode_base58(&st);
     assert_eq!(res, "EQJsjkd6JaGwxrjEhfeqPenqHwrBmPQZjJGNSCHBkcF7");
+}
+
+#[test]
+fn ex05_01() {
+    let secret = PrivateKey::new(U256::from_u32(5002u32));
+    let pubkey = secret.point;
+    let address = pubkey.address(false, true);
+    assert_eq!(address, "mmTPbXQFxboEtNRkwfh6K51jvdtHLxGeMA");
+}
+
+#[test]
+fn ex05_02() {
+    let n_2020 = S256Field::new(U256::from_u32(2020u32));
+    let n_2020_p5 = n_2020.pow(I256::from(5));
+    let secret = PrivateKey::new(n_2020_p5.num);
+    let pubkey = secret.point;
+    let address = pubkey.address(true, true);
+    assert_eq!(address, "mopVkxp8UhXqRYbCYJsbeE1h1fiF64jcoH");
+}
+
+#[test]
+fn ex05_03() {
+    let secret = PrivateKey::new(U256::from_be_hex("00000000000000000000000000000000000000000000000000012345deadbeef"));
+    let pubkey = secret.point;
+    let address = pubkey.address(true, false);
+    assert_eq!(address, "1F1Pn2y6pDb68E5nYJJeba4TLg2U7B6KF1");
+}
+
+#[test]
+fn ex06_01() {
+    let secret = PrivateKey::new(U256::from_u32(5003u32));
+    let wif = secret.wif(true, true);
+    assert_eq!(wif, "cMahea7zqjxrtgAbB7LSGbcQUr1uX1ojuat9jZodMN8rFTv2sfUK");
+}
+
+#[test]
+fn ex06_02() {
+    let n_2021 = S256Field::new(U256::from_u32(2021u32));
+    let n_2021_p5 = n_2021.pow(I256::from(5));
+    let secret = PrivateKey::new(n_2021_p5.num);
+    let wif = secret.wif(false, true);
+    assert_eq!(wif, "91avARGdfge8E4tZfYLoxeJ5sGBdNJQH4kvjpWAxgzczjbCwxic");
+}
+
+#[test]
+fn ex06_03() {
+    let secret = PrivateKey::new(U256::from_be_hex("00000000000000000000000000000000000000000000000000054321deadbeef"));
+    let wif = secret.wif(true, false);
+    assert_eq!(wif, "KwDiBf89QgGbjEhKnhXJuH7LrciVrZi3qYjgiuQJv1h8Ytr2S53a");
+}
+
+#[test]
+fn ex07() {
+    let bytes = [0xB1, 0x07];
+    let number = little_endian_to_int(&bytes);
+    assert_eq!(number, U256::from_u32(1969u32));
+}
+
+#[test]
+fn ex08() {
+    let bytes = int_to_little_endian(U256::from_u32(1969u32),32);
+    assert_eq!(bytes[0], 0xB1);
+    assert_eq!(bytes[1], 0x07);
+}
+
+#[test]
+fn ex09() {
+    let my_secret = b"satoshi_rocks_big_time";
+
+    let hash_of_secret = hash256(my_secret);
+    let pv_key = PrivateKey::new(little_endian_to_int(&hash_of_secret));
+    let pub_key = pv_key.point;
+
+    let address = pub_key.address(true, true);
+
+    assert_eq!(address, "mmvuTBC7D6rWyjHnd3BJRSFvX1jQVvw4SV");
 }

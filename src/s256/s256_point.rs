@@ -1,6 +1,6 @@
 use std::ops;
 use crypto_bigint::{I256, U256};
-use crate::s256::{s256_field::S256Field, signature::Signature, scalr::Scalar};
+use crate::{algorithms::{base58::base58_check, hash160::hash160}, s256::{s256_field::S256Field, scalr::Scalar, signature::Signature}};
 
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
 pub struct S256Point(Option<S256Field>, Option<S256Field>);
@@ -150,6 +150,19 @@ impl S256Point {
         } else {
             S256Point::new(Some(x), Some(odd_beta))
         }
+    }
+
+    pub fn address(self, compressed: bool, testnet: bool) -> String {
+        let sec = self.sec(compressed);
+        let h160 = hash160(&sec);
+
+        let version = if testnet { 0x6f } else { 0x00 };
+
+        let mut payload = Vec::with_capacity(21);
+        payload.push(version);
+        payload.extend_from_slice(&h160);
+
+        base58_check(&payload)
     }
 
 }

@@ -1,3 +1,5 @@
+use crate::algorithms::hash256::hash256;
+
 pub const BASE58_ALPHABET: &[u8; 58] = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
 pub fn encode_base58(bytes: &[u8]) -> String {
@@ -42,4 +44,11 @@ pub fn encode_base58(bytes: &[u8]) -> String {
 
     encoded.reverse();
     String::from_utf8(encoded).expect("base58 output is valid utf8")
+}
+
+pub fn base58_check(bytes: &[u8]) -> String {
+    let checksum = hash256(bytes);
+    let mut extended = Vec::from(bytes);
+    extended.extend_from_slice(&checksum[0..4]);
+    encode_base58(&extended).into()
 }
