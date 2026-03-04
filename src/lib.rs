@@ -1,6 +1,7 @@
 pub mod primitives;
 pub mod s256;
 pub mod algorithms;
+pub mod bitcoin;
 
 #[macro_export]
 macro_rules! fe32 {
