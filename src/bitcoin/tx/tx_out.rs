@@ -26,7 +26,7 @@ impl TxOut {
         ))
     }
 
-    pub fn serialize(self) -> Vec<u8> {
+    pub fn serialize(&self) -> Vec<u8> {
         let mut result: Vec<u8> = Vec::new();
         result.extend_from_slice(&int_to_little_endian(U256::from_u64(self.amount), 8));
 

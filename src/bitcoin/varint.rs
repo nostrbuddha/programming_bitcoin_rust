@@ -31,17 +31,17 @@ pub fn encode_varint(variant: U256) -> Vec<u8> {
     let mut v = Vec::new();
     if variant < U256::from(0xfdu32) {
         int_to_little_endian(variant, 1)
-    } else if variant < U256::from_be_slice(b"10000") {
+    } else if variant < U256::from(0x10000u64) {
         v.push(0xfd);
-        v.copy_from_slice(&int_to_little_endian(variant, 2));
+        v.extend_from_slice(&int_to_little_endian(variant, 2));
         v
-    } else if variant < U256::from_be_slice(b"100000000") {
+    } else if variant < U256::from(0x100000000u64) {
         v.push(0xfe);
-        v.copy_from_slice(&int_to_little_endian(variant, 4));
+        v.extend_from_slice(&int_to_little_endian(variant, 4));
         v
-    } else if variant < U256::from_be_slice(b"10000000000000000") {
+    } else if variant < U256::from(0x10000000000000000u128) {
         v.push(0xff);
-        v.copy_from_slice(&int_to_little_endian(variant, 8));
+        v.extend_from_slice(&int_to_little_endian(variant, 8));
         v
     } else {
         vec![]

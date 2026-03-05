@@ -1,7 +1,7 @@
 use std::io::{self, Read};
 use crypto_bigint::U256;
 
-use crate::{algorithms::endian::int_to_little_endian, bitcoin::{utils::{read_bytes, read_u32_le}, varint::{encode_varint, read_varint}}};
+use crate::{algorithms::endian::int_to_little_endian, bitcoin::{tx::tx::{Network, Tx}, tx_fetcher::TxFetcher, utils::{read_bytes, read_u32_le}, varint::{encode_varint, read_varint}}};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct OutPoint {
@@ -40,7 +40,7 @@ impl TxIn {
         ))
     }
 
-    pub fn serialize(self) -> Vec<u8> {
+    pub fn serialize(&self) -> Vec<u8> {
         let mut result: Vec<u8> = Vec::new();
         result.extend_from_slice(&self.previous_output.tx_id);
         result.extend_from_slice(&int_to_little_endian(U256::from_u32(self.previous_output.vout), 4));
@@ -54,5 +54,26 @@ impl TxIn {
         result.extend_from_slice(&int_to_little_endian(U256::from_u32(self.sequence), 4));
 
         result
+    }
+
+    pub fn fetch_tx<'a>(
+        &self, 
+        fetcher: &'a mut TxFetcher, 
+        network: Network
+    ) -> Result<&'a Tx, Box<dyn std::error::Error>> {
+        let mut tx_id_bytes = self.previous_output.tx_id;
+        tx_id_bytes.reverse();
+        let txid = hex::encode(tx_id_bytes);
+        fetcher.fetch(&txid, network)
+    }
+
+    pub fn value(&self, fetcher: &mut TxFetcher, network: Network) -> u64 {
+        let tx = self.fetch_tx(fetcher, network).unwrap();
+        tx.tx_outs[self.previous_output.vout as usize].amount
+    }
+
+    pub fn script_pubkey<'a>(&self, fetcher: &'a mut TxFetcher, network: Network) -> &'a [u8] {
+        let tx = self.fetch_tx(fetcher, network).unwrap();
+        &tx.tx_outs[self.previous_output.vout as usize].script_pubkey
     }
 }
