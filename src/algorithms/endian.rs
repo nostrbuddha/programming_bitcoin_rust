@@ -23,3 +23,15 @@ pub fn int_to_little_endian(n: U256, length: usize) -> Vec<u8> {
     bytes.truncate(length);
     bytes
 }
+
+pub fn  little_endian_to_u64(bytes: &[u8]) -> u64 {
+    let mut buf = [0u8; 8];
+    buf[..bytes.len()].copy_from_slice(bytes);
+    u64::from_le_bytes(buf)
+}
+
+pub fn u64_to_little_endian(n: u64, length: usize) -> Vec<u8> {
+    let mut bytes = n.to_le_bytes().to_vec();
+    bytes.truncate(length);
+    bytes
+}
